@@ -1,0 +1,41 @@
+database:
+  dsn: "postgres://user:pass@localhost:5432/mydb?sslmode=disable"
+
+options:
+  dry_run: false
+  stop_on_error: false
+  batch_size: 1000
+
+# Tables will be loaded in the order they are defined here.
+# If a table has foreign key/s, make sure to define it after the tables it depends on.
+tables:
+  - name: users
+    file: data/users.csv
+    truncate_before_load: true
+    columns:
+      id:
+        source: USER_ID
+      email:
+        source: EMAIL_ADDRESS
+      created_at:
+        source: CREATED_DATE
+        transform: oracle_date
+      is_active:
+        source: ACTIVE_FLAG
+        transform: oracle_bool
+    ignore_columns:
+      - LEGACY_STATUS
+
+  - name: orders
+    file: data/orders.csv
+    truncate_before_load: true
+    columns:
+      id:
+        source: ORDER_ID
+      user_id:
+        source: USER_ID
+      total:
+        source: TOTAL_AMOUNT
+      created_at:
+        source: CREATED_DATE
+        transform: oracle_date

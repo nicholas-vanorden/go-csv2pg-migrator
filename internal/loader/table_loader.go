@@ -1,0 +1,96 @@
+package loader
+
+import (
+	"context"
+	"encoding/csv"
+	"fmt"
+	"os"
+
+	"oracle2pg/internal/config"
+	"oracle2pg/internal/transform"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type TableLoader struct {
+	pool  *pgxpool.Pool
+	cfg   *config.Config
+	table config.TableConfig
+}
+
+func NewTableLoader(pool *pgxpool.Pool, cfg *config.Config, table config.TableConfig) *TableLoader {
+	return &TableLoader{
+		pool:  pool,
+		cfg:   cfg,
+		table: table,
+	}
+}
+
+func (t *TableLoader) Load(ctx context.Context) error {
+	file, err := os.Open(t.table.File)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	headers, err := reader.Read()
+	if err != nil {
+		return err
+	}
+
+	headerIndex := make(map[string]int)
+	for i, h := range headers {
+		headerIndex[h] = i
+	}
+
+	tx, err := t.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if t.table.TruncateBeforeLoad {
+		_, err := tx.Exec(ctx, fmt.Sprintf("TRUNCATE TABLE %s CASCADE", t.table.Name))
+		if err != nil {
+			return err
+		}
+	}
+
+	for {
+		record, err := reader.Read()
+		if err != nil {
+			break
+		}
+
+		row := make(map[string]any)
+
+		for targetCol, colCfg := range t.table.Columns {
+			raw := record[headerIndex[colCfg.Source]]
+
+			if colCfg.Transform != "" {
+				tf := transform.Registry[colCfg.Transform]
+				val, err := tf(raw)
+				if err != nil {
+					fmt.Printf("transform error: %v\n", err)
+					continue
+				}
+				row[targetCol] = val
+			} else {
+				row[targetCol] = raw
+			}
+		}
+
+		if !t.cfg.Options.DryRun {
+			// TODO: Use CopyFrom for performance (simplified for skeleton)
+			fmt.Printf("Would insert row: %v\n", row)
+		}
+	}
+
+	if t.cfg.Options.DryRun {
+		fmt.Println("Dry run - rolling back")
+		return nil
+	}
+
+	return tx.Commit(ctx)
+}
