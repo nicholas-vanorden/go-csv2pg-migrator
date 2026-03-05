@@ -65,7 +65,14 @@ func (t *TableLoader) Load(ctx context.Context) error {
 		row := make(map[string]any)
 
 		for targetCol, colCfg := range t.table.Columns {
-			raw := record[headerIndex[colCfg.Source]]
+			idx, ok := headerIndex[colCfg.Source]
+			if !ok {
+				return fmt.Errorf("source column %q not found in CSV headers", colCfg.Source)
+			}
+			if idx >= len(record) {
+				return fmt.Errorf("record has fewer columns than expected (need index %d)", idx)
+			}
+			raw := record[idx]
 
 			if colCfg.Transform != "" {
 				tf, ok := transform.Registry[colCfg.Transform]
