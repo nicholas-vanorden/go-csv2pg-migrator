@@ -95,16 +95,14 @@ func (t *TableLoader) Load(ctx context.Context) error {
 			}
 		}
 
-		if !t.cfg.Options.DryRun {
-			// TODO: Use CopyFrom for performance (simplified for skeleton)
+		if t.cfg.Options.DryRun {
 			fmt.Printf("Would insert row: %v\n", row)
+			continue
 		}
+
+		return fmt.Errorf("non-dry-run insert path is not implemented for table %q", t.table.Name)
 	}
 
-	if t.cfg.Options.DryRun {
-		fmt.Println("Dry run - rolling back")
-		return nil
-	}
-
-	return tx.Commit(ctx)
+	fmt.Println("Dry run - rolling back")
+	return nil
 }
