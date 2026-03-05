@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"oracle2pg/internal/config"
+	"github.com/nicholas-vanorden/go-csv2pg-migrator/internal/config"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

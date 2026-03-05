@@ -1,3 +1,5 @@
+package transform
+
 type TransformFunc func(string) (any, error)
 
 var Registry = map[string]TransformFunc{

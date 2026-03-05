@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	"oracle2pg/internal/config"
-	"oracle2pg/internal/transform"
-
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/nicholas-vanorden/go-csv2pg-migrator/internal/config"
+	"github.com/nicholas-vanorden/go-csv2pg-migrator/internal/transform"
 )
 
 type TableLoader struct {

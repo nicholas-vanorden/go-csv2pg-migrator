@@ -5,8 +5,8 @@ import (
 	"flag"
 	"log"
 
-	"oracle2pg/internal/config"
-	"oracle2pg/internal/loader"
+	"github.com/nicholas-vanorden/go-csv2pg-migrator/internal/config"
+	"github.com/nicholas-vanorden/go-csv2pg-migrator/internal/loader"
 )
 
 func main() {
