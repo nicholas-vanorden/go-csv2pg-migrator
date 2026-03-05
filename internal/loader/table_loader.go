@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -58,8 +59,11 @@ func (t *TableLoader) Load(ctx context.Context) error {
 
 	for {
 		record, err := reader.Read()
-		if err != nil {
+		if err == io.EOF {
 			break
+		}
+		if err != nil {
+			return fmt.Errorf("error reading CSV record: %w", err)
 		}
 
 		row := make(map[string]any)
