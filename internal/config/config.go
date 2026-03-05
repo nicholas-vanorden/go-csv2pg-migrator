@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -36,19 +37,25 @@ type ColumnConfig struct {
 }
 
 func Load(path string) (*Config, error) {
-	bytes, err := os.ReadFile(path)
+	configBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
 	var cfg Config
-	if err := yaml.Unmarshal(bytes, &cfg); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(configBytes))
+	dec.KnownFields(true)
+	if err := dec.Decode(&cfg); err != nil {
 		return nil, err
 	}
 
 	if cfg.Options.BatchSize <= 0 {
 		cfg.Options.BatchSize = 1000 // default batch size
 	}
+
+	// if err := cfg.Validate(); err != nil {
+	// 	return nil, err
+	// }
 
 	return &cfg, nil
 }
