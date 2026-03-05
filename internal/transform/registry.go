@@ -1,5 +1,9 @@
 package transform
 
+import (
+	"fmt"
+)
+
 type TransformFunc func(string) (any, error)
 
 var Registry = map[string]TransformFunc{
@@ -8,11 +12,11 @@ var Registry = map[string]TransformFunc{
 }
 
 func OracleDate(input string) (any, error) {
-	// TODO:Implement date transformation logic here
-	return input, nil
+	// TODO:Implement date transformation logic
+	return nil, fmt.Errorf("oracle_date transform is not implemented")
 }
 
 func OracleBool(input string) (any, error) {
-	// TODO:Implement boolean transformation logic here
-	return input, nil
+	// TODO:Implement boolean transformation logic
+	return nil, fmt.Errorf("oracle_bool transform is not implemented")
 }
