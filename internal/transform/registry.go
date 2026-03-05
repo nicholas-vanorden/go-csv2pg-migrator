@@ -8,11 +8,11 @@ var Registry = map[string]TransformFunc{
 }
 
 func OracleDate(input string) (any, error) {
-	// Implement your date transformation logic here
+	// TODO:Implement date transformation logic here
 	return input, nil
 }
 
 func OracleBool(input string) (any, error) {
-	// Implement your boolean transformation logic here
+	// TODO:Implement boolean transformation logic here
 	return input, nil
 }
