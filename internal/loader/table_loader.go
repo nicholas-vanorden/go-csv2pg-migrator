@@ -68,7 +68,10 @@ func (t *TableLoader) Load(ctx context.Context) error {
 			raw := record[headerIndex[colCfg.Source]]
 
 			if colCfg.Transform != "" {
-				tf := transform.Registry[colCfg.Transform]
+				tf, ok := transform.Registry[colCfg.Transform]
+				if !ok {
+					return fmt.Errorf("unknown transform %q for column %q", colCfg.Transform, targetCol)
+				}
 				val, err := tf(raw)
 				if err != nil {
 					fmt.Printf("transform error: %v\n", err)
