@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nicholas-vanorden/go-csv2pg-migrator/internal/config"
 	"github.com/nicholas-vanorden/go-csv2pg-migrator/internal/transform"
@@ -51,7 +52,8 @@ func (t *TableLoader) Load(ctx context.Context) error {
 	defer tx.Rollback(ctx)
 
 	if t.table.TruncateBeforeLoad {
-		_, err := tx.Exec(ctx, fmt.Sprintf("TRUNCATE TABLE %s CASCADE", t.table.Name))
+		// Use pgx.Identifier to safely quote the table name
+		_, err := tx.Exec(ctx, fmt.Sprintf("TRUNCATE TABLE %s CASCADE", pgx.Identifier{t.table.Name}.Sanitize()))
 		if err != nil {
 			return err
 		}

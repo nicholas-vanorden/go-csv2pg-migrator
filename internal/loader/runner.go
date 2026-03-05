@@ -2,7 +2,7 @@ package loader
 
 import (
 	"context"
-	"fmt"
+	"log"
 
 	"github.com/nicholas-vanorden/go-csv2pg-migrator/internal/config"
 
@@ -25,14 +25,14 @@ func (r *Runner) Run(ctx context.Context) error {
 	defer pool.Close()
 
 	for _, table := range r.cfg.Tables {
-		fmt.Printf("Loading table: %s\n", table.Name)
+		log.Printf("Loading table: %s\n", table.Name)
 
 		loader := NewTableLoader(pool, r.cfg, table)
 		if err := loader.Load(ctx); err != nil {
 			if r.cfg.Options.StopOnError {
 				return err
 			}
-			fmt.Printf("Error loading %s: %v\n", table.Name, err)
+			log.Printf("Error loading %s: %v\n", table.Name, err)
 		}
 	}
 

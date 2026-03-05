@@ -46,5 +46,9 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 
+	if cfg.Options.BatchSize <= 0 {
+		cfg.Options.BatchSize = 1000 // default batch size
+	}
+
 	return &cfg, nil
 }

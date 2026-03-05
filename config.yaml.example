@@ -4,7 +4,7 @@ database:
 options:
   dry_run: false
   stop_on_error: false
-  batch_size: 1000
+  batch_size: 100 # default: 1000
 
 # Tables will be loaded in the order they are defined here.
 # If a table has foreign key/s, make sure to define it after the tables it depends on.
