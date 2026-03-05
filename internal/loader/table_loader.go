@@ -87,8 +87,7 @@ func (t *TableLoader) Load(ctx context.Context) error {
 				}
 				val, err := tf(raw)
 				if err != nil {
-					fmt.Printf("transform error: %v\n", err)
-					continue
+					return fmt.Errorf("transform %q failed for target column %q (source %q): %w", colCfg.Transform, targetCol, colCfg.Source, err)
 				}
 				row[targetCol] = val
 			} else {
