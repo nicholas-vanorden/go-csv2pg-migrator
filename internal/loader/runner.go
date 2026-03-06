@@ -86,6 +86,8 @@ func (r *Runner) createTableIfNotExists(ctx context.Context, pool *pgxpool.Pool,
 		strings.Join(columnDefs, ", "),
 	)
 
-	_, err := pool.Exec(ctx, query)
-	return err
+	if _, err := pool.Exec(ctx, query); err != nil {
+		return fmt.Errorf("create table %q: %w", table.Name, err)
+	}
+	return nil
 }
