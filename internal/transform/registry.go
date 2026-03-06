@@ -7,16 +7,16 @@ import (
 type TransformFunc func(string) (any, error)
 
 var Registry = map[string]TransformFunc{
-	"oracle_date": OracleDate,
-	"oracle_bool": OracleBool,
+	"date":    Date,
+	"boolean": Boolean,
 }
 
-func OracleDate(input string) (any, error) {
+func Date(input string) (any, error) {
 	// TODO:Implement date transformation logic
-	return nil, fmt.Errorf("oracle_date transform is not implemented")
+	return nil, fmt.Errorf("date transform is not implemented")
 }
 
-func OracleBool(input string) (any, error) {
+func Boolean(input string) (any, error) {
 	// TODO:Implement boolean transformation logic
-	return nil, fmt.Errorf("oracle_bool transform is not implemented")
+	return nil, fmt.Errorf("boolean transform is not implemented")
 }

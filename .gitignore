@@ -32,3 +32,6 @@ config.yaml
 
 # Editor/IDE
 .vscode/
+
+# Test Data
+data/
