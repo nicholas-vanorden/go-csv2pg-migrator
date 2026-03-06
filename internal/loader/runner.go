@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -12,6 +13,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+var allowedColumnType = regexp.MustCompile(`(?i)^(smallint|integer|bigint|numeric(\(\d+\s*(,\s*\d+)?\))?|real|double precision|text|varchar(\(\d+\))?|boolean|date|timestamp(\s+with(out)?\s+time\s+zone)?)$`)
 
 type Runner struct {
 	cfg *config.Config
@@ -70,6 +73,9 @@ func (r *Runner) createTableIfNotExists(ctx context.Context, pool *pgxpool.Pool,
 		colType := strings.TrimSpace(colCfg.Type)
 		if colType == "" {
 			return fmt.Errorf("column %q in table %q is missing required type when create_tables_if_not_exist is enabled", colName, table.Name)
+		}
+		if !allowedColumnType.MatchString(colType) {
+			return fmt.Errorf("column %q in table %q has unsupported type %q", colName, table.Name, colType)
 		}
 		columnDefs = append(columnDefs, fmt.Sprintf("%s %s", pgx.Identifier{colName}.Sanitize(), colType))
 	}

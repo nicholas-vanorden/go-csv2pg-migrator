@@ -34,4 +34,4 @@ config.yaml
 .vscode/
 
 # Test Data
-data/
+/data/
