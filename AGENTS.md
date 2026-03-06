@@ -1,13 +1,18 @@
-# go-csv2pg-migrator
+# AGENTS.md
 
-Config-driven CLI tool to migrate data from CSV files to Postgres.
+## Purpose
 
-## CLI Args
+This repository contains a golang CLI tool to move data from CSV files into a Postgres database.
 
--config string
-    Path to config file (default "config.yaml")
--dry-run
-    Run without committing to database
+## Scope
+
+- Primary runtime file: `cmd/migrator/main.go`
+- Documentation: `README.md`
+
+## CLI Arguments
+
+- -config (path to config file, default: "config.yaml")
+- -dry-run (Run without committing to database, default: false)
 
 ## Configuration (YAML)
 
@@ -29,3 +34,12 @@ Config-driven CLI tool to migrate data from CSV files to Postgres.
       - type: postgres column type (required when create_tables_if_not_exist is true)
   - ignore_columns (can be 0 to many)
     - csv_column_name
+
+## Editing Guardrails
+
+- Keep changes minimal and consistent with current style.
+- If changing configuration shape, update both README.md and AGENTS.md.
+
+## Validation Checklist (before merge)
+
+1. Golang syntax check passes for all .go files.

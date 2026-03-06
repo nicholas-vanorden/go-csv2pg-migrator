@@ -18,9 +18,10 @@ type DatabaseConfig struct {
 }
 
 type Options struct {
-	DryRun      bool `yaml:"dry_run"`
-	StopOnError bool `yaml:"stop_on_error"`
-	BatchSize   int  `yaml:"batch_size"`
+	DryRun                 bool `yaml:"dry_run"`
+	StopOnError            bool `yaml:"stop_on_error"`
+	BatchSize              int  `yaml:"batch_size"`
+	CreateTablesIfNotExist bool `yaml:"create_tables_if_not_exist"`
 }
 
 type TableConfig struct {
@@ -34,6 +35,7 @@ type TableConfig struct {
 type ColumnConfig struct {
 	Source    string `yaml:"source"`
 	Transform string `yaml:"transform"`
+	Type      string `yaml:"type"`
 }
 
 func Load(path string) (*Config, error) {
