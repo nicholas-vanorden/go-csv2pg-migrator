@@ -44,6 +44,7 @@ tables:
       total:
         source: TOTAL_AMOUNT
         type: NUMERIC(12,2)
+        transform: money
       created_at:
         source: CREATED_DATE
         transform: date
