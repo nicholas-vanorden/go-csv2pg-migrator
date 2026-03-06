@@ -2,10 +2,13 @@ package transform
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var moneyPattern = regexp.MustCompile(`^[+-]?(\d+|\d{1,3}(,\d{3})+)(\.\d+)?$`)
 
 type TransformFunc func(string) (any, error)
 
@@ -66,8 +69,16 @@ func Money(input string) (any, error) {
 	}
 
 	s = strings.ReplaceAll(s, "$", "")
-	s = strings.ReplaceAll(s, ",", "")
 	s = strings.TrimSpace(s)
+
+	if !moneyPattern.MatchString(s) {
+		return nil, fmt.Errorf("unsupported money value %q", input)
+	}
+	s = strings.ReplaceAll(s, ",", "")
+
+	if negative && strings.HasPrefix(s, "-") {
+		return nil, fmt.Errorf("unsupported money value %q: conflicting negative notation", input)
+	}
 
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
