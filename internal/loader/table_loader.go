@@ -81,18 +81,22 @@ func (t *TableLoader) Load(ctx context.Context) error {
 	}
 
 	tableID := tableIdentifier(t.table.Name)
+	dryRun := t.cfg.Options.DryRun
 
-	tx, err := t.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	if t.table.TruncateBeforeLoad {
-		// Use pgx.Identifier to safely quote the table name
-		_, err := tx.Exec(ctx, fmt.Sprintf("TRUNCATE TABLE %s CASCADE", tableID.Sanitize()))
+	var tx pgx.Tx
+	if !dryRun {
+		tx, err = t.pool.Begin(ctx)
 		if err != nil {
 			return err
+		}
+		defer tx.Rollback(ctx)
+
+		if t.table.TruncateBeforeLoad {
+			// Use pgx.Identifier to safely quote the table name
+			_, err := tx.Exec(ctx, fmt.Sprintf("TRUNCATE TABLE %s CASCADE", tableID.Sanitize()))
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -168,7 +172,7 @@ func (t *TableLoader) Load(ctx context.Context) error {
 			row[i] = val
 		}
 
-		if t.cfg.Options.DryRun {
+		if dryRun {
 			printableRow := make(map[string]any, len(targetColumns))
 			for i, col := range targetColumns {
 				printableRow[col] = row[i]
@@ -188,8 +192,8 @@ func (t *TableLoader) Load(ctx context.Context) error {
 		}
 	}
 
-	if t.cfg.Options.DryRun {
-		fmt.Println("Dry run - rolling back")
+	if dryRun {
+		fmt.Println("Dry run - no transaction started")
 		return nil
 	}
 
