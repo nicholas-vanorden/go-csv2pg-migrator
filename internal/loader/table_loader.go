@@ -142,11 +142,10 @@ func (t *TableLoader) Load(ctx context.Context) error {
 			idx := sourceIndexes[i]
 			if idx >= len(record) {
 				return fmt.Errorf(
-					"record has fewer columns than expected at line %d (need index %d, got %d, record=%v)",
+					"record has fewer columns than expected at line %d (need index %d, got %d)",
 					lineNum,
 					idx,
 					len(record),
-					record,
 				)
 			}
 			raw := record[idx]
@@ -159,13 +158,12 @@ func (t *TableLoader) Load(ctx context.Context) error {
 			if err != nil {
 				colCfg := t.table.Columns[targetCol]
 				return fmt.Errorf(
-					"transform %q failed for target column %q (source %q) at line %d (column_index=%d, raw=%q): %w",
+					"transform %q failed for target column %q (source %q) at line %d (column_index=%d): %w",
 					colCfg.Transform,
 					targetCol,
 					colCfg.Source,
 					lineNum,
 					idx,
-					raw,
 					err,
 				)
 			}
