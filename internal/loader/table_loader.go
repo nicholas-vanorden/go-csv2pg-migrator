@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -26,6 +27,14 @@ func NewTableLoader(pool *pgxpool.Pool, cfg *config.Config, table config.TableCo
 		cfg:   cfg,
 		table: table,
 	}
+}
+
+func tableIdentifier(tableName string) pgx.Identifier {
+	parts := strings.Split(strings.TrimSpace(tableName), ".")
+	if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+		return pgx.Identifier{parts[0], parts[1]}
+	}
+	return pgx.Identifier{strings.TrimSpace(tableName)}
 }
 
 func (t *TableLoader) Load(ctx context.Context) error {
@@ -71,6 +80,8 @@ func (t *TableLoader) Load(ctx context.Context) error {
 		}
 	}
 
+	tableID := tableIdentifier(t.table.Name)
+
 	tx, err := t.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -79,7 +90,7 @@ func (t *TableLoader) Load(ctx context.Context) error {
 
 	if t.table.TruncateBeforeLoad {
 		// Use pgx.Identifier to safely quote the table name
-		_, err := tx.Exec(ctx, fmt.Sprintf("TRUNCATE TABLE %s CASCADE", pgx.Identifier{t.table.Name}.Sanitize()))
+		_, err := tx.Exec(ctx, fmt.Sprintf("TRUNCATE TABLE %s CASCADE", tableID.Sanitize()))
 		if err != nil {
 			return err
 		}
@@ -91,32 +102,48 @@ func (t *TableLoader) Load(ctx context.Context) error {
 	}
 
 	batchRows := make([][]any, 0, batchSize)
-	copyBatch := func() error {
+	copyBatch := func(batchStartLine int) error {
 		if len(batchRows) == 0 {
 			return nil
 		}
-		_, err := tx.CopyFrom(ctx, pgx.Identifier{t.table.Name}, targetColumns, pgx.CopyFromRows(batchRows))
+		batchEndLine := batchStartLine + len(batchRows) - 1
+		_, err := tx.CopyFrom(ctx, tableID, targetColumns, pgx.CopyFromRows(batchRows))
 		if err != nil {
-			return err
+			return fmt.Errorf(
+				"copy batch failed for table %q (csv lines %d-%d): %w",
+				t.table.Name,
+				batchStartLine,
+				batchEndLine,
+				err,
+			)
 		}
 		batchRows = batchRows[:0]
 		return nil
 	}
 
+	lineNum := 1 // header line already read
+	batchStartLine := 0
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("error reading CSV record: %w", err)
+			return fmt.Errorf("error reading CSV record at line %d: %w", lineNum+1, err)
 		}
+		lineNum++
 
 		row := make([]any, len(targetColumns))
 		for i, targetCol := range targetColumns {
 			idx := sourceIndexes[i]
 			if idx >= len(record) {
-				return fmt.Errorf("record has fewer columns than expected (need index %d)", idx)
+				return fmt.Errorf(
+					"record has fewer columns than expected at line %d (need index %d, got %d, record=%v)",
+					lineNum,
+					idx,
+					len(record),
+					record,
+				)
 			}
 			raw := record[idx]
 			tf := transforms[i]
@@ -127,7 +154,16 @@ func (t *TableLoader) Load(ctx context.Context) error {
 			val, err := tf(raw)
 			if err != nil {
 				colCfg := t.table.Columns[targetCol]
-				return fmt.Errorf("transform %q failed for target column %q (source %q): %w", colCfg.Transform, targetCol, colCfg.Source, err)
+				return fmt.Errorf(
+					"transform %q failed for target column %q (source %q) at line %d (column_index=%d, raw=%q): %w",
+					colCfg.Transform,
+					targetCol,
+					colCfg.Source,
+					lineNum,
+					idx,
+					raw,
+					err,
+				)
 			}
 			row[i] = val
 		}
@@ -141,10 +177,13 @@ func (t *TableLoader) Load(ctx context.Context) error {
 			continue
 		}
 
+		if len(batchRows) == 0 {
+			batchStartLine = lineNum
+		}
 		batchRows = append(batchRows, row)
 		if len(batchRows) >= batchSize {
-			if err := copyBatch(); err != nil {
-				return fmt.Errorf("copy batch failed for table %q: %w", t.table.Name, err)
+			if err := copyBatch(batchStartLine); err != nil {
+				return err
 			}
 		}
 	}
@@ -154,8 +193,8 @@ func (t *TableLoader) Load(ctx context.Context) error {
 		return nil
 	}
 
-	if err := copyBatch(); err != nil {
-		return fmt.Errorf("copy final batch failed for table %q: %w", t.table.Name, err)
+	if err := copyBatch(batchStartLine); err != nil {
+		return err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
