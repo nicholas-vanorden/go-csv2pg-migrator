@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -45,6 +46,31 @@ func (t *TableLoader) Load(ctx context.Context) error {
 		headerIndex[h] = i
 	}
 
+	targetColumns := make([]string, 0, len(t.table.Columns))
+	for targetCol := range t.table.Columns {
+		targetColumns = append(targetColumns, targetCol)
+	}
+	sort.Strings(targetColumns)
+
+	sourceIndexes := make([]int, len(targetColumns))
+	transforms := make([]transform.TransformFunc, len(targetColumns))
+	for i, targetCol := range targetColumns {
+		colCfg := t.table.Columns[targetCol]
+		idx, ok := headerIndex[colCfg.Source]
+		if !ok {
+			return fmt.Errorf("source column %q not found in CSV headers", colCfg.Source)
+		}
+		sourceIndexes[i] = idx
+
+		if colCfg.Transform != "" {
+			tf, ok := transform.Registry[colCfg.Transform]
+			if !ok {
+				return fmt.Errorf("unknown transform %q for column %q", colCfg.Transform, targetCol)
+			}
+			transforms[i] = tf
+		}
+	}
+
 	tx, err := t.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -59,6 +85,24 @@ func (t *TableLoader) Load(ctx context.Context) error {
 		}
 	}
 
+	batchSize := t.cfg.Options.BatchSize
+	if batchSize <= 0 {
+		batchSize = 1000
+	}
+
+	batchRows := make([][]any, 0, batchSize)
+	copyBatch := func() error {
+		if len(batchRows) == 0 {
+			return nil
+		}
+		_, err := tx.CopyFrom(ctx, pgx.Identifier{t.table.Name}, targetColumns, pgx.CopyFromRows(batchRows))
+		if err != nil {
+			return err
+		}
+		batchRows = batchRows[:0]
+		return nil
+	}
+
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
@@ -68,41 +112,55 @@ func (t *TableLoader) Load(ctx context.Context) error {
 			return fmt.Errorf("error reading CSV record: %w", err)
 		}
 
-		row := make(map[string]any)
-
-		for targetCol, colCfg := range t.table.Columns {
-			idx, ok := headerIndex[colCfg.Source]
-			if !ok {
-				return fmt.Errorf("source column %q not found in CSV headers", colCfg.Source)
-			}
+		row := make([]any, len(targetColumns))
+		for i, targetCol := range targetColumns {
+			idx := sourceIndexes[i]
 			if idx >= len(record) {
 				return fmt.Errorf("record has fewer columns than expected (need index %d)", idx)
 			}
 			raw := record[idx]
-
-			if colCfg.Transform != "" {
-				tf, ok := transform.Registry[colCfg.Transform]
-				if !ok {
-					return fmt.Errorf("unknown transform %q for column %q", colCfg.Transform, targetCol)
-				}
-				val, err := tf(raw)
-				if err != nil {
-					return fmt.Errorf("transform %q failed for target column %q (source %q): %w", colCfg.Transform, targetCol, colCfg.Source, err)
-				}
-				row[targetCol] = val
-			} else {
-				row[targetCol] = raw
+			tf := transforms[i]
+			if tf == nil {
+				row[i] = raw
+				continue
 			}
+			val, err := tf(raw)
+			if err != nil {
+				colCfg := t.table.Columns[targetCol]
+				return fmt.Errorf("transform %q failed for target column %q (source %q): %w", colCfg.Transform, targetCol, colCfg.Source, err)
+			}
+			row[i] = val
 		}
 
 		if t.cfg.Options.DryRun {
-			fmt.Printf("Would insert row: %v\n", row)
+			printableRow := make(map[string]any, len(targetColumns))
+			for i, col := range targetColumns {
+				printableRow[col] = row[i]
+			}
+			fmt.Printf("Would insert row: %v\n", printableRow)
 			continue
 		}
 
-		return fmt.Errorf("non-dry-run insert path is not implemented for table %q", t.table.Name)
+		batchRows = append(batchRows, row)
+		if len(batchRows) >= batchSize {
+			if err := copyBatch(); err != nil {
+				return fmt.Errorf("copy batch failed for table %q: %w", t.table.Name, err)
+			}
+		}
 	}
 
-	fmt.Println("Dry run - rolling back")
+	if t.cfg.Options.DryRun {
+		fmt.Println("Dry run - rolling back")
+		return nil
+	}
+
+	if err := copyBatch(); err != nil {
+		return fmt.Errorf("copy final batch failed for table %q: %w", t.table.Name, err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
