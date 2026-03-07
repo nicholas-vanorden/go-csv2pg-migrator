@@ -29,12 +29,23 @@ func NewTableLoader(pool *pgxpool.Pool, cfg *config.Config, table config.TableCo
 	}
 }
 
-func tableIdentifier(tableName string) pgx.Identifier {
-	parts := strings.Split(strings.TrimSpace(tableName), ".")
-	if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
-		return pgx.Identifier{parts[0], parts[1]}
+func tableIdentifier(tableName string) (pgx.Identifier, error) {
+	trimmed := strings.TrimSpace(tableName)
+	if trimmed == "" {
+		return nil, fmt.Errorf("table name is empty")
 	}
-	return pgx.Identifier{strings.TrimSpace(tableName)}
+
+	parts := strings.Split(trimmed, ".")
+	identifier := make(pgx.Identifier, 0, len(parts))
+	for _, part := range parts {
+		segment := strings.TrimSpace(part)
+		if segment == "" {
+			return nil, fmt.Errorf("invalid table name %q: empty identifier segment", tableName)
+		}
+		identifier = append(identifier, segment)
+	}
+
+	return identifier, nil
 }
 
 func (t *TableLoader) Load(ctx context.Context) error {
@@ -80,7 +91,10 @@ func (t *TableLoader) Load(ctx context.Context) error {
 		}
 	}
 
-	tableID := tableIdentifier(t.table.Name)
+	tableID, err := tableIdentifier(t.table.Name)
+	if err != nil {
+		return err
+	}
 	dryRun := t.cfg.Options.DryRun
 
 	var tx pgx.Tx
@@ -127,6 +141,9 @@ func (t *TableLoader) Load(ctx context.Context) error {
 
 	lineNum := 1 // header line already read
 	batchStartLine := 0
+	dryRunPrintLimit := 10
+	dryRunPrintedRows := 0
+	dryRunTotalRows := 0
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
@@ -171,11 +188,16 @@ func (t *TableLoader) Load(ctx context.Context) error {
 		}
 
 		if dryRun {
+			dryRunTotalRows++
+			if dryRunPrintedRows >= dryRunPrintLimit {
+				continue
+			}
 			printableRow := make(map[string]any, len(targetColumns))
 			for i, col := range targetColumns {
 				printableRow[col] = row[i]
 			}
 			fmt.Printf("Would insert row: %v\n", printableRow)
+			dryRunPrintedRows++
 			continue
 		}
 
@@ -191,6 +213,9 @@ func (t *TableLoader) Load(ctx context.Context) error {
 	}
 
 	if dryRun {
+		if dryRunTotalRows > dryRunPrintedRows {
+			fmt.Printf("... and %d more rows\n", dryRunTotalRows-dryRunPrintedRows)
+		}
 		fmt.Println("Dry run - no transaction started")
 		return nil
 	}
