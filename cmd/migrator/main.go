@@ -12,6 +12,9 @@ import (
 func main() {
 	configPath := flag.String("config", "config.yaml", "Path to config file")
 	dryRun := flag.Bool("dry-run", false, "Run without committing to database")
+	stopOnError := flag.Bool("stop-on-error", false, "Stop when a record fails")
+	batchSize := flag.Int("batch-size", 0, "Table insert batch size")
+	createTables := flag.Bool("create-tables", false, "Create tables if not exist (tables created during dry-run as well)")
 	flag.Parse()
 
 	cfg, err := config.Load(*configPath)
@@ -21,6 +24,18 @@ func main() {
 
 	if *dryRun {
 		cfg.Options.DryRun = true
+	}
+
+	if *stopOnError {
+		cfg.Options.StopOnError = true
+	}
+
+	if *batchSize > 0 {
+		cfg.Options.BatchSize = *batchSize
+	}
+
+	if *createTables {
+		cfg.Options.CreateTablesIfNotExist = true
 	}
 
 	runner := loader.NewRunner(cfg)
