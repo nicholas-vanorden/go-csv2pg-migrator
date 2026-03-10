@@ -3,7 +3,7 @@
 ## Quick Summary
 
 - Config-driven CLI to load CSV files into Postgres using `pgx.CopyFrom`.
-- Dry-run parses/transforms rows and prints a limited sample; it does not write or truncate.
+- Dry-run parses/transforms rows and prints a limited sample; it does not write or truncate tables (but table creation still executes if enabled).
 - Optional table creation via config/flag requires column types.
 
 ## Purpose
@@ -50,7 +50,7 @@ This repository contains a golang CLI tool to move data from CSV files into a Po
 ## Runtime Behavior
 
 - Tables are processed in the order defined in config (define parent tables before dependent tables).
-- If `create_tables_if_not_exist` is true, `CREATE TABLE IF NOT EXISTS` is executed before loading.
+- If `create_tables_if_not_exist` is true, `CREATE TABLE IF NOT EXISTS` is executed before loading (executes even in dry-run mode).
 - If `truncate_before_load` is true and not in dry-run, the table is truncated inside a transaction.
 - Loads use `pgx.CopyFrom` with `batch_size` rows per batch.
 - Schema-qualified table names (e.g., `schema.table`) are supported.
