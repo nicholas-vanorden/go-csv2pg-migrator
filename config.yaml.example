@@ -1,11 +1,15 @@
 database:
+  # Used unless -postgres-dsn is provided on the CLI.
   dsn: "postgres://user:pass@localhost:5432/mydb?sslmode=disable"
 
 options:
+  # Boolean CLI flags are true when provided; otherwise use these values (default: false).
   dry_run: false
   stop_on_error: false
+  # CLI -batch-size is used only if > 0. Otherwise this value is used (default: 1000).
   batch_size: 100 # default: 1000
-  create_tables_if_not_exist: false # tables still created when dry_run: true
+  # tables still created when dry_run: true
+  create_tables_if_not_exist: false
 
 # Tables will be loaded in the order they are defined here.
 # If a table has foreign key/s, make sure to define it after the tables it depends on.
