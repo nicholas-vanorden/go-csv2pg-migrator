@@ -21,6 +21,7 @@ This repository contains a golang CLI tool to move data from CSV files into a Po
 ## CLI Arguments
 
 - -config (path to config file, default: "config.yaml")
+- -postgres-dsn (postgres connection string, overrides `database.dsn` when provided)
 - -dry-run (Run without committing to database, default: false)
 - -stop-on-error (Stop when a record fails, default: false)
 - -batch-size (Table insert batch size, default: 1000)
@@ -50,6 +51,9 @@ This repository contains a golang CLI tool to move data from CSV files into a Po
 ## Runtime Behavior
 
 - Tables are processed in the order defined in config (define parent tables before dependent tables).
+- `-postgres-dsn` uses the CLI value if provided; otherwise it uses `database.dsn` from `config.yaml`.
+- Boolean flags (`-dry-run`, `-stop-on-error`, `-create-tables`) are `true` if provided. If not provided, they use the value in `config.yaml`. If not in `config.yaml`, they default to `false`.
+- `-batch-size` uses the CLI value only if provided and greater than `0`. If not provided or not greater than `0`, it uses `options.batch_size` from `config.yaml`. If neither is valid, it defaults to `1000`.
 - If `create_tables_if_not_exist` is true, `CREATE TABLE IF NOT EXISTS` is executed before loading (executes even in dry-run mode).
 - If `truncate_before_load` is true and not in dry-run, the table is truncated inside a transaction.
 - Loads use `pgx.CopyFrom` with `batch_size` rows per batch.

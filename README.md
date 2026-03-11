@@ -17,7 +17,7 @@ Config-driven CLI tool to migrate data from CSV files into Postgres with batchin
 ## Quick Start
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/nicholas-vanorden/go-csv2pg-migrator.git
 cd go-csv2pg-migrator
 cp config.yaml.example config.yaml
 go build -o csv2pg ./cmd/migrator
@@ -27,10 +27,17 @@ go build -o csv2pg ./cmd/migrator
 ## CLI Args
 
 - `-config` Path to config file (default `config.yaml`)
+- `-postgres-dsn` Postgres connection string (overrides `database.dsn` in config when provided)
 - `-dry-run` Run without committing to database
 - `-stop-on-error` Stop when a record fails
 - `-batch-size` Table insert batch size (overrides config)
 - `-create-tables` Create tables if not exist (tables created during dry-run as well)
+
+### CLI and Config Precedence
+
+- `-postgres-dsn` uses the CLI value if provided; otherwise it uses `database.dsn` from `config.yaml`.
+- Boolean flags (`-dry-run`, `-stop-on-error`, `-create-tables`) are `true` if provided. If not provided, they use the value in `config.yaml`. If not in `config.yaml`, they default to `false`.
+- `-batch-size` uses the CLI value only if provided and greater than `0`. If not provided or not greater than `0`, it uses `options.batch_size` from `config.yaml`. If neither is valid, it defaults to `1000`.
 
 ## Configuration (YAML)
 
