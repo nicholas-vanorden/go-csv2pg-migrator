@@ -24,8 +24,9 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	if strings.TrimSpace(*postgresDsn) != "" {
-		cfg.Database.DSN = *postgresDsn
+	trimmedDsn := strings.TrimSpace(*postgresDsn)
+	if trimmedDsn != "" {
+		cfg.Database.DSN = trimmedDsn
 	}
 
 	if *dryRun {

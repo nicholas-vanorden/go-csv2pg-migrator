@@ -3,7 +3,7 @@
 ## Quick Summary
 
 - Config-driven CLI to load CSV files into Postgres using `pgx.CopyFrom`.
-- Dry-run parses/transforms rows and prints a limited sample; it does not write or truncate tables (but table creation still executes if enabled).
+- Dry-run parses/transforms rows and prints a limited sample; it does not insert data or truncate tables (but `CREATE TABLE IF NOT EXISTS` still executes if enabled).
 - Optional table creation via config/flag requires column types.
 
 ## Purpose
@@ -24,7 +24,7 @@ This repository contains a golang CLI tool to move data from CSV files into a Po
 - -postgres-dsn (postgres connection string, overrides `database.dsn` when provided)
 - -dry-run (Run without committing to database, default: false)
 - -stop-on-error (Stop when a record fails, default: false)
-- -batch-size (Table insert batch size, default: 1000)
+- -batch-size (Table insert batch size override; the CLI flag defaults to 0 and only overrides config when > 0)
 - -create-tables (Create tables if not exist, tables created during dry-run as well, default: false)
 
 ## Configuration (YAML)
