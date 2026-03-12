@@ -136,7 +136,7 @@ Available transform functions:
 ## Behavior Notes
 
 - Tables load in the order listed in config.
-- `create_tables_if_not_exist` uses `CREATE TABLE IF NOT EXISTS` with configured column types (executes even in dry-run mode) and applies configured primary/foreign key constraints.
+- `create_tables_if_not_exist` uses `CREATE TABLE IF NOT EXISTS` with configured column types (executes even in dry-run mode). Configured primary/foreign key constraints are included in the `CREATE TABLE` statement and only take effect when the table is created (they are not added if the table already exists).
 - `truncate_before_load` truncates before load in non-dry-run mode only.
 - Dry-run prints the first 10 rows per table and summarizes suppressed rows.
 - Errors include CSV line numbers and raw values where possible.

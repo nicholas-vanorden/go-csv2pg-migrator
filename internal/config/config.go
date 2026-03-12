@@ -72,6 +72,11 @@ func Load(path string) (*Config, error) {
 }
 
 func (c *Config) Validate() error {
+	tableByName := make(map[string]TableConfig, len(c.Tables))
+	for _, table := range c.Tables {
+		tableByName[strings.TrimSpace(table.Name)] = table
+	}
+
 	for _, table := range c.Tables {
 		primaryKeyCount := 0
 		for colName, colCfg := range table.Columns {
@@ -79,8 +84,28 @@ func (c *Config) Validate() error {
 				primaryKeyCount++
 			}
 			if colCfg.ForeignKey != nil {
-				if strings.TrimSpace(colCfg.ForeignKey.Table) == "" || strings.TrimSpace(colCfg.ForeignKey.Column) == "" {
+				fkTable := strings.TrimSpace(colCfg.ForeignKey.Table)
+				fkColumn := strings.TrimSpace(colCfg.ForeignKey.Column)
+				if fkTable == "" || fkColumn == "" {
 					return fmt.Errorf("column %q in table %q has foreign_key set but is missing table or column", colName, table.Name)
+				}
+				targetTable, ok := tableByName[fkTable]
+				if !ok {
+					return fmt.Errorf(
+						"column %q in table %q references missing foreign key table %q",
+						colName,
+						table.Name,
+						fkTable,
+					)
+				}
+				if _, ok := targetTable.Columns[fkColumn]; !ok {
+					return fmt.Errorf(
+						"column %q in table %q references missing foreign key column %q on table %q",
+						colName,
+						table.Name,
+						fkColumn,
+						fkTable,
+					)
 				}
 			}
 		}

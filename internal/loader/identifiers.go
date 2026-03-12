@@ -14,6 +14,9 @@ func tableIdentifier(tableName string) (pgx.Identifier, error) {
 	}
 
 	parts := strings.Split(trimmed, ".")
+	if len(parts) > 2 {
+		return nil, fmt.Errorf("invalid table name %q: too many identifier segments (%d)", tableName, len(parts))
+	}
 	identifier := make(pgx.Identifier, 0, len(parts))
 	for _, part := range parts {
 		segment := strings.TrimSpace(part)
