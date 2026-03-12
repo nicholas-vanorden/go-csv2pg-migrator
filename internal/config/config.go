@@ -2,7 +2,9 @@ package config
 
 import (
 	"bytes"
+	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -33,9 +35,16 @@ type TableConfig struct {
 }
 
 type ColumnConfig struct {
-	Source    string `yaml:"source"`
-	Transform string `yaml:"transform"`
-	Type      string `yaml:"type"`
+	Source     string             `yaml:"source"`
+	Transform  string             `yaml:"transform"`
+	Type       string             `yaml:"type"`
+	PrimaryKey bool               `yaml:"primary_key"`
+	ForeignKey *ForeignKeyConfig  `yaml:"foreign_key"`
+}
+
+type ForeignKeyConfig struct {
+	Table  string `yaml:"table"`
+	Column string `yaml:"column"`
 }
 
 func Load(path string) (*Config, error) {
@@ -55,9 +64,29 @@ func Load(path string) (*Config, error) {
 		cfg.Options.BatchSize = 1000 // default batch size
 	}
 
-	// if err := cfg.Validate(); err != nil {
-	// 	return nil, err
-	// }
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
 
 	return &cfg, nil
+}
+
+func (c *Config) Validate() error {
+	for _, table := range c.Tables {
+		primaryKeyCount := 0
+		for colName, colCfg := range table.Columns {
+			if colCfg.PrimaryKey {
+				primaryKeyCount++
+			}
+			if colCfg.ForeignKey != nil {
+				if strings.TrimSpace(colCfg.ForeignKey.Table) == "" || strings.TrimSpace(colCfg.ForeignKey.Column) == "" {
+					return fmt.Errorf("column %q in table %q has foreign_key set but is missing table or column", colName, table.Name)
+				}
+			}
+		}
+		if primaryKeyCount > 1 {
+			return fmt.Errorf("table %q has more than one primary key column configured", table.Name)
+		}
+	}
+	return nil
 }

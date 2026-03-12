@@ -21,6 +21,7 @@ tables:
       id:
         source: USER_ID
         type: TEXT
+        primary_key: true
       email:
         source: EMAIL_ADDRESS
         type: TEXT
@@ -42,9 +43,13 @@ tables:
       id:
         source: ORDER_ID
         type: TEXT
+        primary_key: true
       user_id:
         source: USER_ID
         type: TEXT
+        foreign_key:
+          table: users
+          column: id
       total:
         source: TOTAL_AMOUNT
         type: NUMERIC(12,2)

@@ -63,6 +63,8 @@ go build -o csv2pg ./cmd/migrator
 - `source` CSV column name
 - `transform` optional transform function
 - `type` Postgres column type (required when `create_tables_if_not_exist` is true)
+- `primary_key` `true/false` (at most one column per table)
+- `foreign_key` optional mapping with `table` and `column` references
 
 ### Example
 
@@ -84,6 +86,7 @@ tables:
       id:
         source: USER_ID
         type: TEXT
+        primary_key: true
       email:
         source: EMAIL_ADDRESS
         type: TEXT
@@ -105,9 +108,13 @@ tables:
       id:
         source: ORDER_ID
         type: TEXT
+        primary_key: true
       user_id:
         source: USER_ID
         type: TEXT
+        foreign_key:
+          table: public.users
+          column: id
       total:
         source: TOTAL_AMOUNT
         transform: money
@@ -129,7 +136,7 @@ Available transform functions:
 ## Behavior Notes
 
 - Tables load in the order listed in config.
-- `create_tables_if_not_exist` uses `CREATE TABLE IF NOT EXISTS` with configured column types (executes even in dry-run mode).
+- `create_tables_if_not_exist` uses `CREATE TABLE IF NOT EXISTS` with configured column types (executes even in dry-run mode) and applies configured primary/foreign key constraints.
 - `truncate_before_load` truncates before load in non-dry-run mode only.
 - Dry-run prints the first 10 rows per table and summarizes suppressed rows.
 - Errors include CSV line numbers and raw values where possible.
