@@ -2,7 +2,9 @@ package config
 
 import (
 	"bytes"
+	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -33,9 +35,16 @@ type TableConfig struct {
 }
 
 type ColumnConfig struct {
-	Source    string `yaml:"source"`
-	Transform string `yaml:"transform"`
-	Type      string `yaml:"type"`
+	Source     string            `yaml:"source"`
+	Transform  string            `yaml:"transform"`
+	Type       string            `yaml:"type"`
+	PrimaryKey bool              `yaml:"primary_key"`
+	ForeignKey *ForeignKeyConfig `yaml:"foreign_key"`
+}
+
+type ForeignKeyConfig struct {
+	Table  string `yaml:"table"`
+	Column string `yaml:"column"`
 }
 
 func Load(path string) (*Config, error) {
@@ -55,9 +64,104 @@ func Load(path string) (*Config, error) {
 		cfg.Options.BatchSize = 1000 // default batch size
 	}
 
-	// if err := cfg.Validate(); err != nil {
-	// 	return nil, err
-	// }
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
 
 	return &cfg, nil
+}
+
+func (c *Config) Validate() error {
+	tableIndex := make(map[string]int, len(c.Tables))
+	tableByName := make(map[string]TableConfig, len(c.Tables))
+	for i, table := range c.Tables {
+		normalizedName, err := normalizeTableName(table.Name)
+		if err != nil {
+			return err
+		}
+		tableByName[normalizedName] = table
+		tableIndex[normalizedName] = i
+	}
+
+	for i, table := range c.Tables {
+		primaryKeyCount := 0
+		for colName, colCfg := range table.Columns {
+			if colCfg.PrimaryKey {
+				primaryKeyCount++
+			}
+			if colCfg.ForeignKey != nil {
+				fkTable, err := normalizeTableName(colCfg.ForeignKey.Table)
+				if err != nil {
+					return fmt.Errorf("column %q in table %q has invalid foreign_key table: %w", colName, table.Name, err)
+				}
+				fkColumn := strings.TrimSpace(colCfg.ForeignKey.Column)
+				if fkColumn == "" {
+					return fmt.Errorf("column %q in table %q has foreign_key set but is missing table or column", colName, table.Name)
+				}
+				targetTable, ok := tableByName[fkTable]
+				if !ok {
+					return fmt.Errorf(
+						"column %q in table %q references missing foreign key table %q",
+						colName,
+						table.Name,
+						fkTable,
+					)
+				}
+				targetCol, ok := targetTable.Columns[fkColumn]
+				if !ok {
+					return fmt.Errorf(
+						"column %q in table %q references missing foreign key column %q on table %q",
+						colName,
+						table.Name,
+						fkColumn,
+						fkTable,
+					)
+				}
+				if c.Options.CreateTablesIfNotExist {
+					targetIndex := tableIndex[fkTable]
+					if targetIndex > i {
+						return fmt.Errorf(
+							"column %q in table %q references foreign key table %q defined later in config",
+							colName,
+							table.Name,
+							fkTable,
+						)
+					}
+					if !targetCol.PrimaryKey {
+						return fmt.Errorf(
+							"column %q in table %q references non-primary-key column %q on table %q",
+							colName,
+							table.Name,
+							fkColumn,
+							fkTable,
+						)
+					}
+				}
+			}
+		}
+		if primaryKeyCount > 1 {
+			return fmt.Errorf("table %q has more than one primary key column configured", table.Name)
+		}
+	}
+	return nil
+}
+
+func normalizeTableName(name string) (string, error) {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return "", fmt.Errorf("table name is empty")
+	}
+	parts := strings.Split(trimmed, ".")
+	if len(parts) > 2 {
+		return "", fmt.Errorf("invalid table name %q: too many identifier segments (%d)", name, len(parts))
+	}
+	normalizedParts := make([]string, 0, len(parts))
+	for _, part := range parts {
+		segment := strings.TrimSpace(part)
+		if segment == "" {
+			return "", fmt.Errorf("invalid table name %q: empty identifier segment", name)
+		}
+		normalizedParts = append(normalizedParts, segment)
+	}
+	return strings.Join(normalizedParts, "."), nil
 }

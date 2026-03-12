@@ -45,6 +45,10 @@ This repository contains a golang CLI tool to move data from CSV files into a Po
       - source: csv_column_name
       - transform: (optional transform function)
       - type: postgres column type (required when create_tables_if_not_exist is true)
+      - primary_key: true/false (at most one per table)
+      - foreign_key: (optional mapping)
+        - table: referenced table name (supports schema.table)
+        - column: referenced column name
   - ignore_columns (can be 0 to many)
     - csv_column_name
 
@@ -54,7 +58,7 @@ This repository contains a golang CLI tool to move data from CSV files into a Po
 - `-postgres-dsn` uses the CLI value if provided; otherwise it uses `database.dsn` from `config.yaml`.
 - Boolean flags (`-dry-run`, `-stop-on-error`, `-create-tables`) are `true` if provided. If not provided, they use the value in `config.yaml`. If not in `config.yaml`, they default to `false`.
 - `-batch-size` uses the CLI value only if provided and greater than `0`. If not provided or not greater than `0`, it uses `options.batch_size` from `config.yaml`. If neither is valid, it defaults to `1000`.
-- If `create_tables_if_not_exist` is true, `CREATE TABLE IF NOT EXISTS` is executed before loading (executes even in dry-run mode).
+- If `create_tables_if_not_exist` is true, `CREATE TABLE IF NOT EXISTS` is executed before loading (executes even in dry-run mode) and applies configured primary/foreign key constraints.
 - If `truncate_before_load` is true and not in dry-run, the table is truncated inside a transaction.
 - Loads use `pgx.CopyFrom` with `batch_size` rows per batch.
 - Schema-qualified table names (e.g., `schema.table`) are supported.
@@ -75,7 +79,7 @@ This repository contains a golang CLI tool to move data from CSV files into a Po
 ## Known Limitations
 
 - Non-dry-run inserts rely solely on `CopyFrom` (no per-row fallback).
-- Table creation does not add PK/FK/index/constraints beyond column definitions.
+- Table creation only supports single-column primary keys and simple foreign key references (no composite keys, indexes, or cascade actions).
 - Multi-part identifiers are treated as `pgx.Identifier` segments, not quoted as a single name.
 
 ## Editing Guardrails
