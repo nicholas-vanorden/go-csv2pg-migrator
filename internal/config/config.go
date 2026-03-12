@@ -75,7 +75,10 @@ func (c *Config) Validate() error {
 	tableIndex := make(map[string]int, len(c.Tables))
 	tableByName := make(map[string]TableConfig, len(c.Tables))
 	for i, table := range c.Tables {
-		normalizedName := normalizeTableName(table.Name)
+		normalizedName, err := normalizeTableName(table.Name)
+		if err != nil {
+			return err
+		}
 		tableByName[normalizedName] = table
 		tableIndex[normalizedName] = i
 	}
@@ -87,7 +90,10 @@ func (c *Config) Validate() error {
 				primaryKeyCount++
 			}
 			if colCfg.ForeignKey != nil {
-				fkTable := normalizeTableName(colCfg.ForeignKey.Table)
+				fkTable, err := normalizeTableName(colCfg.ForeignKey.Table)
+				if err != nil {
+					return fmt.Errorf("column %q in table %q has invalid foreign_key table: %w", colName, table.Name, err)
+				}
 				fkColumn := strings.TrimSpace(colCfg.ForeignKey.Column)
 				if fkTable == "" || fkColumn == "" {
 					return fmt.Errorf("column %q in table %q has foreign_key set but is missing table or column", colName, table.Name)
@@ -101,6 +107,16 @@ func (c *Config) Validate() error {
 						fkTable,
 					)
 				}
+				targetCol, ok := targetTable.Columns[fkColumn]
+				if !ok {
+					return fmt.Errorf(
+						"column %q in table %q references missing foreign key column %q on table %q",
+						colName,
+						table.Name,
+						fkColumn,
+						fkTable,
+					)
+				}
 				if c.Options.CreateTablesIfNotExist {
 					targetIndex := tableIndex[fkTable]
 					if targetIndex > i {
@@ -111,15 +127,15 @@ func (c *Config) Validate() error {
 							fkTable,
 						)
 					}
-				}
-				if _, ok := targetTable.Columns[fkColumn]; !ok {
-					return fmt.Errorf(
-						"column %q in table %q references missing foreign key column %q on table %q",
-						colName,
-						table.Name,
-						fkColumn,
-						fkTable,
-					)
+					if !targetCol.PrimaryKey {
+						return fmt.Errorf(
+							"column %q in table %q references non-primary-key column %q on table %q",
+							colName,
+							table.Name,
+							fkColumn,
+							fkTable,
+						)
+					}
 				}
 			}
 		}
@@ -130,19 +146,22 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func normalizeTableName(name string) string {
+func normalizeTableName(name string) (string, error) {
 	trimmed := strings.TrimSpace(name)
 	if trimmed == "" {
-		return ""
+		return "", fmt.Errorf("table name is empty")
 	}
 	parts := strings.Split(trimmed, ".")
+	if len(parts) > 2 {
+		return "", fmt.Errorf("invalid table name %q: too many identifier segments (%d)", name, len(parts))
+	}
 	normalizedParts := make([]string, 0, len(parts))
 	for _, part := range parts {
 		segment := strings.TrimSpace(part)
 		if segment == "" {
-			continue
+			return "", fmt.Errorf("invalid table name %q: empty identifier segment", name)
 		}
 		normalizedParts = append(normalizedParts, segment)
 	}
-	return strings.Join(normalizedParts, ".")
+	return strings.Join(normalizedParts, "."), nil
 }
