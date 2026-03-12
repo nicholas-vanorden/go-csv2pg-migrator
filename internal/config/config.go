@@ -72,19 +72,22 @@ func Load(path string) (*Config, error) {
 }
 
 func (c *Config) Validate() error {
+	tableIndex := make(map[string]int, len(c.Tables))
 	tableByName := make(map[string]TableConfig, len(c.Tables))
-	for _, table := range c.Tables {
-		tableByName[strings.TrimSpace(table.Name)] = table
+	for i, table := range c.Tables {
+		normalizedName := normalizeTableName(table.Name)
+		tableByName[normalizedName] = table
+		tableIndex[normalizedName] = i
 	}
 
-	for _, table := range c.Tables {
+	for i, table := range c.Tables {
 		primaryKeyCount := 0
 		for colName, colCfg := range table.Columns {
 			if colCfg.PrimaryKey {
 				primaryKeyCount++
 			}
 			if colCfg.ForeignKey != nil {
-				fkTable := strings.TrimSpace(colCfg.ForeignKey.Table)
+				fkTable := normalizeTableName(colCfg.ForeignKey.Table)
 				fkColumn := strings.TrimSpace(colCfg.ForeignKey.Column)
 				if fkTable == "" || fkColumn == "" {
 					return fmt.Errorf("column %q in table %q has foreign_key set but is missing table or column", colName, table.Name)
@@ -97,6 +100,17 @@ func (c *Config) Validate() error {
 						table.Name,
 						fkTable,
 					)
+				}
+				if c.Options.CreateTablesIfNotExist {
+					targetIndex := tableIndex[fkTable]
+					if targetIndex > i {
+						return fmt.Errorf(
+							"column %q in table %q references foreign key table %q defined later in config",
+							colName,
+							table.Name,
+							fkTable,
+						)
+					}
 				}
 				if _, ok := targetTable.Columns[fkColumn]; !ok {
 					return fmt.Errorf(
@@ -114,4 +128,21 @@ func (c *Config) Validate() error {
 		}
 	}
 	return nil
+}
+
+func normalizeTableName(name string) string {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return ""
+	}
+	parts := strings.Split(trimmed, ".")
+	normalizedParts := make([]string, 0, len(parts))
+	for _, part := range parts {
+		segment := strings.TrimSpace(part)
+		if segment == "" {
+			continue
+		}
+		normalizedParts = append(normalizedParts, segment)
+	}
+	return strings.Join(normalizedParts, ".")
 }
