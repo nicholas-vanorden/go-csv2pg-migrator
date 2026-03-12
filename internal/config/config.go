@@ -35,11 +35,11 @@ type TableConfig struct {
 }
 
 type ColumnConfig struct {
-	Source     string             `yaml:"source"`
-	Transform  string             `yaml:"transform"`
-	Type       string             `yaml:"type"`
-	PrimaryKey bool               `yaml:"primary_key"`
-	ForeignKey *ForeignKeyConfig  `yaml:"foreign_key"`
+	Source     string            `yaml:"source"`
+	Transform  string            `yaml:"transform"`
+	Type       string            `yaml:"type"`
+	PrimaryKey bool              `yaml:"primary_key"`
+	ForeignKey *ForeignKeyConfig `yaml:"foreign_key"`
 }
 
 type ForeignKeyConfig struct {
@@ -95,7 +95,7 @@ func (c *Config) Validate() error {
 					return fmt.Errorf("column %q in table %q has invalid foreign_key table: %w", colName, table.Name, err)
 				}
 				fkColumn := strings.TrimSpace(colCfg.ForeignKey.Column)
-				if fkTable == "" || fkColumn == "" {
+				if fkColumn == "" {
 					return fmt.Errorf("column %q in table %q has foreign_key set but is missing table or column", colName, table.Name)
 				}
 				targetTable, ok := tableByName[fkTable]
