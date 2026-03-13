@@ -7,6 +7,7 @@ Config-driven CLI tool to migrate data from CSV files into Postgres with batchin
 - CSV-to-Postgres loading using `pgx.CopyFrom` with configurable batch size
 - Optional `CREATE TABLE IF NOT EXISTS` support
 - Dry-run mode that validates transforms and prints a limited row sample
+- Reporting: console summary, JSON migration report, and per-table error CSVs
 - Schema-qualified table names supported (e.g., `schema.table`)
 
 ## Requirements
@@ -140,6 +141,9 @@ Available transform functions:
 - `truncate_before_load` truncates before load in non-dry-run mode only.
 - Dry-run prints the first 10 rows per table and summarizes suppressed rows.
 - Errors include CSV line numbers and raw values where possible.
+- Reporting always creates a `reports/` folder and writes `reports/migration_summary.json` (structured report with per-table stats).
+- Reporting writes `reports/{table}_errors.csv` for any table with row-level failures.
+- Console output includes per-table stats and a final migration summary.
 
 ## Build and Run
 

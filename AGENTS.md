@@ -16,6 +16,7 @@ This repository contains a golang CLI tool to move data from CSV files into a Po
 - Documentation: `README.md`
 - Config parsing: `internal/config/config.go`
 - Load pipeline: `internal/loader/runner.go`, `internal/loader/table_loader.go`
+- Reporting: `internal/report/report.go`
 - Transforms: `internal/transform/registry.go`
 
 ## CLI Arguments
@@ -63,6 +64,9 @@ This repository contains a golang CLI tool to move data from CSV files into a Po
 - Loads use `pgx.CopyFrom` with `batch_size` rows per batch.
 - Schema-qualified table names (e.g., `schema.table`) are supported.
 - Errors include CSV line numbers and raw values where relevant.
+- Reporting always creates a `reports/` folder and writes `reports/migration_summary.json` (serialized `report.MigrationReport`).
+- Reporting writes `reports/{table}_errors.csv` per table with row-level failures (serialized `report.RowError`).
+- Console output includes per-table stats and a final migration summary.
 
 ## Transforms
 
