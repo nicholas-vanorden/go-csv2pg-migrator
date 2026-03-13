@@ -19,6 +19,7 @@ import (
 )
 
 var allowedColumnType = regexp.MustCompile(`(?i)^(smallint|integer|bigint|numeric(\(\d+\s*(,\s*\d+)?\))?|real|double precision|text|varchar(\(\d+\))?|boolean|date|timestamp(\s+with(out)?\s+time\s+zone)?)$`)
+var unsafeFilenameChars = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1f]`)
 
 type Runner struct {
 	cfg *config.Config
@@ -110,11 +111,9 @@ func sanitizeReportName(name string) string {
 	replacer := strings.NewReplacer(
 		".", "_",
 		" ", "_",
-		"/", "_",
-		"\\", "_",
-		":", "_",
 	)
-	return replacer.Replace(strings.TrimSpace(name))
+	sanitized := replacer.Replace(strings.TrimSpace(name))
+	return unsafeFilenameChars.ReplaceAllString(sanitized, "_")
 }
 
 func (r *Runner) createTableIfNotExists(ctx context.Context, pool *pgxpool.Pool, table config.TableConfig) error {

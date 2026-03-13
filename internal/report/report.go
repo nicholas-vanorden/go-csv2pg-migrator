@@ -39,12 +39,17 @@ func WriteJSONReport(path string, report MigrationReport) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 
-	return encoder.Encode(report)
+	err = encoder.Encode(report)
+	return err
 }
 
 func WriteErrorCSV(path string, errors []RowError) error {
@@ -55,17 +60,20 @@ func WriteErrorCSV(path string, errors []RowError) error {
 	defer file.Close()
 
 	writer := csv.NewWriter(file)
-	defer writer.Flush()
-
-	writer.Write([]string{"line_number", "error", "raw_row"})
+	if err := writer.Write([]string{"line_number", "error", "raw_row"}); err != nil {
+		return err
+	}
 
 	for _, e := range errors {
-		writer.Write([]string{
+		if err := writer.Write([]string{
 			strconv.Itoa(e.LineNumber),
 			e.Error,
 			strings.Join(e.RawRow, ","),
-		})
+		}); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	writer.Flush()
+	return writer.Error()
 }
