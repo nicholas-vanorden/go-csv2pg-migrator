@@ -47,7 +47,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 	defer pool.Close()
 
-	for _, table := range r.cfg.Tables {
+	for i, table := range r.cfg.Tables {
 		log.Printf("Loading table: %s\n", table.Name)
 
 		if r.cfg.Options.CreateTablesIfNotExist {
@@ -70,7 +70,10 @@ func (r *Runner) Run(ctx context.Context) error {
 		}
 
 		if len(result.RowErrors) > 0 {
-			errorFile := filepath.Join(reportsDir, fmt.Sprintf("%s_errors.csv", sanitizeReportName(table.Name)))
+			errorFile := filepath.Join(
+				reportsDir,
+				fmt.Sprintf("%03d_%s_errors.csv", i+1, sanitizeReportName(table.Name)),
+			)
 			if err := report.WriteErrorCSV(errorFile, result.RowErrors); err != nil {
 				return fmt.Errorf("write error report for table %q: %w", table.Name, err)
 			}

@@ -34,7 +34,7 @@ type RowError struct {
 	RawRow     []string
 }
 
-func WriteJSONReport(path string, report MigrationReport) error {
+func WriteJSONReport(path string, report MigrationReport) (err error) {
 	file, err := os.Create(path)
 	if err != nil {
 		return err
@@ -52,12 +52,16 @@ func WriteJSONReport(path string, report MigrationReport) error {
 	return err
 }
 
-func WriteErrorCSV(path string, errors []RowError) error {
+func WriteErrorCSV(path string, errors []RowError) (err error) {
 	file, err := os.Create(path)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	writer := csv.NewWriter(file)
 	if err := writer.Write([]string{"line_number", "error", "raw_row"}); err != nil {
