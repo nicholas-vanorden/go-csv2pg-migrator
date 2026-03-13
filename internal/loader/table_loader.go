@@ -7,10 +7,12 @@ import (
 	"io"
 	"os"
 	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nicholas-vanorden/go-csv2pg-migrator/internal/config"
+	"github.com/nicholas-vanorden/go-csv2pg-migrator/internal/report"
 	"github.com/nicholas-vanorden/go-csv2pg-migrator/internal/transform"
 )
 
@@ -18,6 +20,11 @@ type TableLoader struct {
 	pool  *pgxpool.Pool
 	cfg   *config.Config
 	table config.TableConfig
+}
+
+type TableResult struct {
+	Report    report.TableReport
+	RowErrors []report.RowError
 }
 
 func NewTableLoader(pool *pgxpool.Pool, cfg *config.Config, table config.TableConfig) *TableLoader {
@@ -28,17 +35,25 @@ func NewTableLoader(pool *pgxpool.Pool, cfg *config.Config, table config.TableCo
 	}
 }
 
-func (t *TableLoader) Load(ctx context.Context) error {
+func (t *TableLoader) Load(ctx context.Context) (result TableResult, err error) {
+	start := time.Now()
+	defer func() {
+		result.Report.DurationSeconds = time.Since(start).Seconds()
+	}()
+
+	result.Report.Table = t.table.Name
+	result.Report.SourceFile = t.table.File
+
 	file, err := os.Open(t.table.File)
 	if err != nil {
-		return err
+		return result, err
 	}
 	defer file.Close()
 
 	reader := csv.NewReader(file)
 	headers, err := reader.Read()
 	if err != nil {
-		return err
+		return result, err
 	}
 
 	headerIndex := make(map[string]int)
@@ -58,14 +73,14 @@ func (t *TableLoader) Load(ctx context.Context) error {
 		colCfg := t.table.Columns[targetCol]
 		idx, ok := headerIndex[colCfg.Source]
 		if !ok {
-			return fmt.Errorf("source column %q not found in CSV headers", colCfg.Source)
+			return result, fmt.Errorf("source column %q not found in CSV headers", colCfg.Source)
 		}
 		sourceIndexes[i] = idx
 
 		if colCfg.Transform != "" {
 			tf, ok := transform.Registry[colCfg.Transform]
 			if !ok {
-				return fmt.Errorf("unknown transform %q for column %q", colCfg.Transform, targetCol)
+				return result, fmt.Errorf("unknown transform %q for column %q", colCfg.Transform, targetCol)
 			}
 			transforms[i] = tf
 		}
@@ -73,15 +88,16 @@ func (t *TableLoader) Load(ctx context.Context) error {
 
 	tableID, err := tableIdentifier(t.table.Name)
 	if err != nil {
-		return err
+		return result, err
 	}
 	dryRun := t.cfg.Options.DryRun
+	stopOnError := t.cfg.Options.StopOnError
 
 	var tx pgx.Tx
 	if !dryRun {
 		tx, err = t.pool.Begin(ctx)
 		if err != nil {
-			return err
+			return result, err
 		}
 		defer tx.Rollback(ctx)
 
@@ -89,7 +105,7 @@ func (t *TableLoader) Load(ctx context.Context) error {
 			// Use pgx.Identifier to safely quote the table name
 			_, err := tx.Exec(ctx, fmt.Sprintf("TRUNCATE TABLE %s CASCADE", tableID.Sanitize()))
 			if err != nil {
-				return err
+				return result, err
 			}
 		}
 	}
@@ -100,14 +116,14 @@ func (t *TableLoader) Load(ctx context.Context) error {
 	}
 
 	batchRows := make([][]any, 0, batchSize)
-	copyBatch := func(batchStartLine int) error {
+	copyBatch := func(batchStartLine int) (int64, error) {
 		if len(batchRows) == 0 {
-			return nil
+			return 0, nil
 		}
 		batchEndLine := batchStartLine + len(batchRows) - 1
-		_, err := tx.CopyFrom(ctx, tableID, targetColumns, pgx.CopyFromRows(batchRows))
+		count, err := tx.CopyFrom(ctx, tableID, targetColumns, pgx.CopyFromRows(batchRows))
 		if err != nil {
-			return fmt.Errorf(
+			return 0, fmt.Errorf(
 				"copy batch failed for table %q (csv lines %d-%d): %w",
 				t.table.Name,
 				batchStartLine,
@@ -116,34 +132,46 @@ func (t *TableLoader) Load(ctx context.Context) error {
 			)
 		}
 		batchRows = batchRows[:0]
-		return nil
+		return count, nil
 	}
 
 	lineNum := 1 // header line already read
 	batchStartLine := 0
 	dryRunPrintLimit := 10
 	dryRunPrintedRows := 0
-	dryRunTotalRows := 0
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("error reading CSV record at line %d: %w", lineNum+1, err)
+			return result, fmt.Errorf("error reading CSV record at line %d: %w", lineNum+1, err)
 		}
 		lineNum++
+		result.Report.RowsTotal++
 
 		row := make([]any, len(targetColumns))
+		rowValid := true
 		for i, targetCol := range targetColumns {
 			idx := sourceIndexes[i]
 			if idx >= len(record) {
-				return fmt.Errorf(
+				rowErr := fmt.Errorf(
 					"record has fewer columns than expected at line %d (need index %d, got %d)",
 					lineNum,
 					idx,
 					len(record),
 				)
+				result.RowErrors = append(result.RowErrors, report.RowError{
+					LineNumber: lineNum,
+					Error:      rowErr.Error(),
+					RawRow:     record,
+				})
+				result.Report.RowsFailed++
+				rowValid = false
+				if stopOnError {
+					return result, rowErr
+				}
+				break
 			}
 			raw := record[idx]
 			tf := transforms[i]
@@ -154,7 +182,7 @@ func (t *TableLoader) Load(ctx context.Context) error {
 			val, err := tf(raw)
 			if err != nil {
 				colCfg := t.table.Columns[targetCol]
-				return fmt.Errorf(
+				rowErr := fmt.Errorf(
 					"transform %q failed for target column %q (source %q) at line %d (column_index=%d): %w",
 					colCfg.Transform,
 					targetCol,
@@ -163,12 +191,26 @@ func (t *TableLoader) Load(ctx context.Context) error {
 					idx,
 					err,
 				)
+				result.RowErrors = append(result.RowErrors, report.RowError{
+					LineNumber: lineNum,
+					Error:      rowErr.Error(),
+					RawRow:     record,
+				})
+				result.Report.RowsFailed++
+				rowValid = false
+				if stopOnError {
+					return result, rowErr
+				}
+				break
 			}
 			row[i] = val
 		}
 
+		if !rowValid {
+			continue
+		}
+
 		if dryRun {
-			dryRunTotalRows++
 			if dryRunPrintedRows >= dryRunPrintLimit {
 				continue
 			}
@@ -186,27 +228,31 @@ func (t *TableLoader) Load(ctx context.Context) error {
 		}
 		batchRows = append(batchRows, row)
 		if len(batchRows) >= batchSize {
-			if err := copyBatch(batchStartLine); err != nil {
-				return err
+			count, err := copyBatch(batchStartLine)
+			if err != nil {
+				return result, err
 			}
+			result.Report.RowsInserted += int(count)
 		}
 	}
 
 	if dryRun {
-		if dryRunTotalRows > dryRunPrintedRows {
-			fmt.Printf("... and %d more rows\n", dryRunTotalRows-dryRunPrintedRows)
+		if result.Report.RowsTotal > dryRunPrintedRows {
+			fmt.Printf("... and %d more rows\n", result.Report.RowsTotal-dryRunPrintedRows)
 		}
 		fmt.Println("Dry run - no transaction started")
-		return nil
+		return result, nil
 	}
 
-	if err := copyBatch(batchStartLine); err != nil {
-		return err
+	count, err := copyBatch(batchStartLine)
+	if err != nil {
+		return result, err
 	}
+	result.Report.RowsInserted += int(count)
 
 	if err := tx.Commit(ctx); err != nil {
-		return err
+		return result, err
 	}
 
-	return nil
+	return result, nil
 }
