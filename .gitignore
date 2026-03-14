@@ -38,4 +38,4 @@ config.yaml
 
 # Test Data
 /data/
-reports/
+/cmd/migrator/reports/
