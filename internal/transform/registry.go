@@ -20,11 +20,12 @@ var Registry = map[string]TransformFunc{
 
 func Date(input string) (any, error) {
 	s := strings.TrimSpace(input)
-	if s == "" {
+	if s == "" || s == "?" {
 		return nil, nil
 	}
 
 	layouts := []string{
+		"01/02/06",
 		"2006-01-02",
 		"01/02/2006",
 		"2006/01/02",
