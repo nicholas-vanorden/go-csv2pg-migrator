@@ -115,28 +115,32 @@ func (t *TableLoader) Load(ctx context.Context) (result TableResult, err error) 
 		batchSize = 1000
 	}
 
-	batchRows := make([][]any, 0, batchSize)
-	copyBatch := func(batchStartLine int) (int64, error) {
+	batchRows := make([]BatchRow, 0, batchSize)
+	flushBatch := func() error {
 		if len(batchRows) == 0 {
-			return 0, nil
+			return nil
 		}
-		batchEndLine := batchStartLine + len(batchRows) - 1
-		count, err := tx.CopyFrom(ctx, tableID, targetColumns, pgx.CopyFromRows(batchRows))
+		batchResult, err := insertBatch(ctx, tx, tableID, targetColumns, batchRows)
 		if err != nil {
-			return 0, fmt.Errorf(
-				"copy batch failed for table %q (csv lines %d-%d): %w",
-				t.table.Name,
-				batchStartLine,
-				batchEndLine,
-				err,
-			)
+			return err
+		}
+		result.Report.RowsInserted += batchResult.Inserted
+		for _, failure := range batchResult.Failures {
+			result.RowErrors = append(result.RowErrors, report.RowError{
+				LineNumber: failure.Row.LineNumber,
+				Error:      failure.Err.Error(),
+				RawRow:     failure.Row.RawRow,
+			})
+			result.Report.RowsFailed++
+		}
+		if stopOnError && len(batchResult.Failures) > 0 {
+			return batchResult.Failures[0].Err
 		}
 		batchRows = batchRows[:0]
-		return count, nil
+		return nil
 	}
 
 	lineNum := 1 // header line already read
-	batchStartLine := 0
 	dryRunPrintLimit := 10
 	dryRunPrintedRows := 0
 	for {
@@ -223,16 +227,15 @@ func (t *TableLoader) Load(ctx context.Context) (result TableResult, err error) 
 			continue
 		}
 
-		if len(batchRows) == 0 {
-			batchStartLine = lineNum
-		}
-		batchRows = append(batchRows, row)
+		batchRows = append(batchRows, BatchRow{
+			LineNumber: lineNum,
+			Values:     row,
+			RawRow:     record,
+		})
 		if len(batchRows) >= batchSize {
-			count, err := copyBatch(batchStartLine)
-			if err != nil {
+			if err := flushBatch(); err != nil {
 				return result, err
 			}
-			result.Report.RowsInserted += int(count)
 		}
 	}
 
@@ -244,11 +247,9 @@ func (t *TableLoader) Load(ctx context.Context) (result TableResult, err error) 
 		return result, nil
 	}
 
-	count, err := copyBatch(batchStartLine)
-	if err != nil {
+	if err := flushBatch(); err != nil {
 		return result, err
 	}
-	result.Report.RowsInserted += int(count)
 
 	if err := tx.Commit(ctx); err != nil {
 		return result, err
