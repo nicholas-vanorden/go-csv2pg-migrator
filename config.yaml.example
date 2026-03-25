@@ -17,6 +17,7 @@ tables:
   - name: users
     file: data/users.csv
     truncate_before_load: true
+    delimiter: "|" # Defaults to ',' (comma) - must be in double or single quotes
     columns:
       id:
         source: USER_ID

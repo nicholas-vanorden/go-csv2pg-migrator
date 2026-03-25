@@ -16,6 +16,7 @@ var Registry = map[string]TransformFunc{
 	"date":    Date,
 	"boolean": Boolean,
 	"money":   Money,
+	"file":    File,
 }
 
 func Date(input string) (any, error) {
@@ -32,6 +33,7 @@ func Date(input string) (any, error) {
 		time.RFC3339,
 		"2006-01-02 15:04:05",
 		"2006-01-02 15:04:05.999999",
+		"01/02/2006 15:04:05",
 	}
 
 	for _, layout := range layouts {
@@ -91,4 +93,13 @@ func Money(input string) (any, error) {
 	}
 
 	return v, nil
+}
+
+func File(input string) (any, error) {
+	lastIndex := strings.LastIndex(input, "\\")
+	if lastIndex != -1 {
+		return input[lastIndex+1:], nil
+	} else {
+		return input, nil
+	}
 }

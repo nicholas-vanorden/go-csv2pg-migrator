@@ -51,6 +51,7 @@ func (t *TableLoader) Load(ctx context.Context) (result TableResult, err error) 
 	defer file.Close()
 
 	reader := csv.NewReader(file)
+	reader.Comma = []rune(t.table.Delimiter)[0]
 	headers, err := reader.Read()
 	if err != nil {
 		return result, err
