@@ -10,16 +10,17 @@ import (
 
 var moneyPattern = regexp.MustCompile(`^[+-]?(\d+|\d{1,3}(,\d{3})+)(\.\d+)?$`)
 
-type TransformFunc func(string) (any, error)
+type TransformFunc func(string, string) (any, error)
 
 var Registry = map[string]TransformFunc{
-	"date":    Date,
-	"boolean": Boolean,
-	"money":   Money,
-	"file":    File,
+	"date":      Date,
+	"boolean":   Boolean,
+	"money":     Money,
+	"file_name": FileName,
+	"file_path": FilePath,
 }
 
-func Date(input string) (any, error) {
+func Date(input string, param string) (any, error) {
 	s := strings.TrimSpace(input)
 	if s == "" || s == "?" {
 		return nil, nil
@@ -45,7 +46,7 @@ func Date(input string) (any, error) {
 	return nil, fmt.Errorf("unsupported date value %q", input)
 }
 
-func Boolean(input string) (any, error) {
+func Boolean(input string, param string) (any, error) {
 	s := strings.ToLower(strings.TrimSpace(input))
 	switch s {
 	case "1", "t", "true", "y", "yes":
@@ -59,7 +60,7 @@ func Boolean(input string) (any, error) {
 	}
 }
 
-func Money(input string) (any, error) {
+func Money(input string, param string) (any, error) {
 	s := strings.TrimSpace(input)
 	if s == "" {
 		return nil, nil
@@ -95,11 +96,28 @@ func Money(input string) (any, error) {
 	return v, nil
 }
 
-func File(input string) (any, error) {
+func FileName(input string, param string) (any, error) {
 	lastIndex := strings.LastIndex(input, "\\")
 	if lastIndex != -1 {
 		return input[lastIndex+1:], nil
 	} else {
 		return input, nil
 	}
+}
+
+func FilePath(input string, param string) (any, error) {
+	if param == "" {
+		return input, nil
+	}
+
+	filename, err := FileName(input, "")
+	if err != nil {
+		return nil, err
+	}
+
+	if !strings.HasSuffix(param, "/") {
+		param = param + "/"
+	}
+
+	return param + fmt.Sprint(filename), nil
 }

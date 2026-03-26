@@ -38,6 +38,7 @@ type TableConfig struct {
 type ColumnConfig struct {
 	Source     string            `yaml:"source"`
 	Transform  string            `yaml:"transform"`
+	Param      string            `yaml:"param"`
 	Type       string            `yaml:"type"`
 	PrimaryKey bool              `yaml:"primary_key"`
 	ForeignKey *ForeignKeyConfig `yaml:"foreign_key"`

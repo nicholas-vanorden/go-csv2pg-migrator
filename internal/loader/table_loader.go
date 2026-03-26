@@ -184,9 +184,9 @@ func (t *TableLoader) Load(ctx context.Context) (result TableResult, err error) 
 				row[i] = raw
 				continue
 			}
-			val, err := tf(raw)
+			colCfg := t.table.Columns[targetCol]
+			val, err := tf(raw, colCfg.Param)
 			if err != nil {
-				colCfg := t.table.Columns[targetCol]
 				rowErr := fmt.Errorf(
 					"transform %q failed for target column %q (source %q) at line %d (column_index=%d): %w",
 					colCfg.Transform,
