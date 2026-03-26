@@ -13,10 +13,12 @@ options:
 
 # Tables will be loaded in the order they are defined here.
 # If a table has foreign key/s, make sure to define it after the tables it depends on.
+# Valid column transforms: date, boolean, money, file_name, file_path
 tables:
   - name: users
     file: data/users.csv
     truncate_before_load: true
+    delimiter: "|" # Defaults to ',' (comma) - must be in double or single quotes
     columns:
       id:
         source: USER_ID
@@ -33,6 +35,11 @@ tables:
         source: ACTIVE_FLAG
         transform: boolean
         type: BOOLEAN
+      file_path:
+        source: file
+        transform: file_path
+        param: public/files/ # optional transform parameter
+        type: TEXT
     ignore_columns:
       - LEGACY_STATUS
 

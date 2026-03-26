@@ -63,6 +63,7 @@ go build -o csv2pg ./cmd/migrator
 
 - `source` CSV column name
 - `transform` optional transform function
+- `param` optional string passed to the transform (used by some transforms, such as `file_path`)
 - `type` Postgres column type (required when `create_tables_if_not_exist` is true)
 - `primary_key` `true/false` (at most one column per table)
 - `foreign_key` optional mapping with `table` and `column` references
@@ -133,6 +134,8 @@ Available transform functions:
 - `date` parses common formats (e.g., `YYYY-MM-DD`, `MM/DD/YYYY`, RFC3339)
 - `boolean` accepts `1/0`, `t/f`, `true/false`, `y/n`, `yes/no`
 - `money` accepts `$` and `,` formatting and parentheses for negatives
+- `file_name` extracts the filename portion of a path-like value
+- `file_path` returns the original value, or when `param` is set, prefixes the extracted filename with `param` (ensures a trailing `/`)
 
 ## Behavior Notes
 

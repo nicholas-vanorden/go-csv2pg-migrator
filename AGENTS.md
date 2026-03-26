@@ -45,6 +45,7 @@ This repository contains a golang CLI tool to move data from CSV files into a Po
     - column_name:
       - source: csv_column_name
       - transform: (optional transform function)
+      - param: (optional) string passed to the transform
       - type: postgres column type (required when create_tables_if_not_exist is true)
       - primary_key: true/false (at most one per table)
       - foreign_key: (optional mapping)
@@ -73,6 +74,8 @@ This repository contains a golang CLI tool to move data from CSV files into a Po
 - `date`: parses common date formats (e.g., `YYYY-MM-DD`, `MM/DD/YYYY`, RFC3339).
 - `boolean`: accepts `1/0`, `t/f`, `true/false`, `y/n`, `yes/no`.
 - `money`: accepts `$` and `,` formatting and parentheses for negatives.
+- `file_name`: extracts the filename portion of a path-like value.
+- `file_path`: returns the original value, or when `param` is set, prefixes the extracted filename with `param` (ensures a trailing `/`).
 
 ## Data Requirements
 
@@ -82,7 +85,7 @@ This repository contains a golang CLI tool to move data from CSV files into a Po
 
 ## Known Limitations
 
-- Non-dry-run inserts rely solely on `CopyFrom` (no per-row fallback).
+- Non-dry-run inserts attempt `CopyFrom` per batch, then fall back to per-row `INSERT` with savepoints when `CopyFrom` fails.
 - Table creation only supports single-column primary keys and simple foreign key references (no composite keys, indexes, or cascade actions).
 - Multi-part identifiers are treated as `pgx.Identifier` segments, not quoted as a single name.
 

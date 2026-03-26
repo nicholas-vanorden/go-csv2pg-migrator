@@ -30,6 +30,7 @@ type TableConfig struct {
 	Name               string                  `yaml:"name"`
 	File               string                  `yaml:"file"`
 	TruncateBeforeLoad bool                    `yaml:"truncate_before_load"`
+	Delimiter          string                  `yaml:"delimiter"`
 	Columns            map[string]ColumnConfig `yaml:"columns"`
 	IgnoreColumns      []string                `yaml:"ignore_columns"`
 }
@@ -37,6 +38,7 @@ type TableConfig struct {
 type ColumnConfig struct {
 	Source     string            `yaml:"source"`
 	Transform  string            `yaml:"transform"`
+	Param      string            `yaml:"param"`
 	Type       string            `yaml:"type"`
 	PrimaryKey bool              `yaml:"primary_key"`
 	ForeignKey *ForeignKeyConfig `yaml:"foreign_key"`
@@ -84,6 +86,9 @@ func (c *Config) Validate() error {
 	}
 
 	for i, table := range c.Tables {
+		if table.Delimiter == "" {
+			c.Tables[i].Delimiter = ","
+		}
 		primaryKeyCount := 0
 		for colName, colCfg := range table.Columns {
 			if colCfg.PrimaryKey {
