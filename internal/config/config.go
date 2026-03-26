@@ -87,7 +87,7 @@ func (c *Config) Validate() error {
 
 	for i, table := range c.Tables {
 		if table.Delimiter == "" {
-			table.Delimiter = ","
+			c.Tables[i].Delimiter = ","
 		}
 		primaryKeyCount := 0
 		for colName, colCfg := range table.Columns {

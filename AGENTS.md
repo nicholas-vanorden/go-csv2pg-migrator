@@ -85,7 +85,7 @@ This repository contains a golang CLI tool to move data from CSV files into a Po
 
 ## Known Limitations
 
-- Non-dry-run inserts rely solely on `CopyFrom` (no per-row fallback).
+- Non-dry-run inserts attempt `CopyFrom` per batch, then fall back to per-row `INSERT` with savepoints when `CopyFrom` fails.
 - Table creation only supports single-column primary keys and simple foreign key references (no composite keys, indexes, or cascade actions).
 - Multi-part identifiers are treated as `pgx.Identifier` segments, not quoted as a single name.
 

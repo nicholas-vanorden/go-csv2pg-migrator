@@ -2,6 +2,7 @@ package transform
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -97,12 +98,7 @@ func Money(input string, param string) (any, error) {
 }
 
 func FileName(input string, param string) (any, error) {
-	lastIndex := strings.LastIndex(input, "\\")
-	if lastIndex != -1 {
-		return input[lastIndex+1:], nil
-	} else {
-		return input, nil
-	}
+	return filepath.Base(input), nil
 }
 
 func FilePath(input string, param string) (any, error) {
@@ -115,9 +111,5 @@ func FilePath(input string, param string) (any, error) {
 		return nil, err
 	}
 
-	if !strings.HasSuffix(param, "/") {
-		param = param + "/"
-	}
-
-	return param + fmt.Sprint(filename), nil
+	return filepath.Join(param, filename.(string)), nil
 }
