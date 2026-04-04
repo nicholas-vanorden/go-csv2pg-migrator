@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var moneyPattern = regexp.MustCompile(`^[+-]?(\d+|\d{1,3}(,\d{3})+)(\.\d+)?$`)
+var moneyPattern = regexp.MustCompile(`^[+-]?((\d+|\d{1,3}(,\d{3})+)(\.\d+)?|\.\d+)$`)
 
 type TransformFunc func(string, string) (any, error)
 
@@ -23,7 +23,7 @@ var Registry = map[string]TransformFunc{
 
 func Date(input string, param string) (any, error) {
 	s := strings.TrimSpace(input)
-	if s == "" || s == "?" {
+	if s == "" || s == "?" || s == "0" {
 		return nil, nil
 	}
 
@@ -36,6 +36,8 @@ func Date(input string, param string) (any, error) {
 		"2006-01-02 15:04:05",
 		"2006-01-02 15:04:05.999999",
 		"01/02/2006 15:04:05",
+		"200601",
+		"20060102",
 	}
 
 	for _, layout := range layouts {
